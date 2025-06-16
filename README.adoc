@@ -1,0 +1,4 @@
+:pp: {plus}{plus}
+
+= C++Script
+Harsha Bhattacharyya <harshabhattacharyya510@duck.com>
