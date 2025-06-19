@@ -1,0 +1,20 @@
+  SECURITY
+ ==========
+ >author:  Harsha Bhattacharyya
+ >license: GPL-V3 or later
+
+ Contact: mailto:harshabhattacharyya510@duck.com
+ Encryption: (link unavailable)
+ Acknowledgments: (link unavailable)
+
+ Reporting Security Issues
+
+ If you discover a security vulnerability, please report it to mailto:harshabhattacharyya510@duck.com . Include a detailed description of the issue and any relevant information.
+
+ Encryption
+
+ You can encrypt your email using our PGP key, available at (link unavailable).
+
+ Acknowledgments
+
+ We acknowledge and thank researchers who responsibly disclose security vulnerabilities. A list of acknowledged researchers can be found at (link unavailable).

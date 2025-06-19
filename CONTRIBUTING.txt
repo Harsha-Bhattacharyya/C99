@@ -1,0 +1,35 @@
+ CONTRIBUTING
+==============
+>author:  Harsha Bhattacharyya
+>license: GPL-V3 or later
+
+Thank you for considering contributing to our project!
+
+ Getting Started
+
+ 1. Fork the repository on GitHub.
+ 2. Clone the forked repository to your local machine.
+ 3. Create a new branch for your changes.
+ 4. Make your changes and commit them with a clear and concise message.
+ 5. Push your changes to your forked repository.
+ 6. Submit a pull request to the main repository.
+
+ Guidelines
+
+ * Follow the project's coding style and conventions.
+ * Write clear and concise commit messages.
+ * Include relevant tests and documentation for your changes.
+ * Be respectful and open to feedback from other contributors.
+
+ Reporting Issues
+
+ * Use the GitHub issue tracker to report bugs or suggest features.
+ * Provide clear and detailed information about the issue.
+ * Include steps to reproduce the issue, if applicable.
+
+ Code of Conduct
+
+ * Be respectful and professional in all interactions.
+ * Follow the project's code of conduct.
+
+ Thank you for your contributions!
