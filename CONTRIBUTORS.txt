@@ -1,0 +1,8 @@
+ CONTRIBUTORS
+==============
+>author:  Harsha Bhattacharyya
+>license: GPL-V3 or later
+
+All contributors are recorded in this file in the format name-contribution-date
+
+1. Harsha Bhattacharyya - Lead Developer - N/A

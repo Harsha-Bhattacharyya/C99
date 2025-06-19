@@ -31,5 +31,8 @@ Thank you for considering contributing to our project!
 
  * Be respectful and professional in all interactions.
  * Follow the project's code of conduct.
+ Contributors file
+
+ All Contributors name and contribution and contribution date is recorded at CONTRIBUTORS.txt
 
  Thank you for your contributions!
