@@ -1,4 +1,4 @@
-// Copyright Harsha Bhattacharyya 2025
+/* Copyright Harsha Bhattacharyya 2025 */
 
 /* This file is part of the C++Script project.
 
@@ -9,9 +9,6 @@ The C++Script project is distributed in the hope that it will be useful, but WIT
 You should have received a copy of the GNU General Public License along with the C++Script project. If not, see <https://www.gnu.org/licenses/>. */
 
 %{
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 enum {
     // Literals
@@ -223,28 +220,3 @@ t|f|true|false      { count_position(); print_token(BOOL_LITERAL, "BOOLEAN"); re
 
 %%
 
-int main(int argc, char **argv) {
-    if (argc > 1) {
-        FILE *file = fopen(argv[1], "r");
-        if (!file) {
-            perror(argv[1]);
-            return 1;
-        }
-        yyin = file;
-    }
-
-    printf("C99 Lexical Analysis\n");
-    printf("====================\n");
-
-    int token;
-    while ((token = yylex()) != 0) {
-        // Tokens are printed in the action code
-    }
-
-    if (argc > 1) {
-        fclose(yyin);
-    }
-
-    printf("\nLexical analysis complete. Total lines: %d\n", line_num - 1);
-    return 0;
-}

@@ -8,35 +8,12 @@ The C++Script project is distributed in the hope that it will be useful, but WIT
 
 You should have received a copy of the GNU General Public License along with the C++Script project. If not, see <https://www.gnu.org/licenses/>. */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "lex.yy.c" // flex file
+#include "lexer/ldriver.c"
 
+int main(int argc, char *argv[]){
 
-int lex(int argc, char *argv[]) {
-    if (argc > 1) {
-        FILE *file = fopen(argv[1], "r");
-        if (!file) {
-            perror(argv[1]);
-            return 1;
-        }
-        yyin = file;
-    }
+lex(argc, argv); // lexer call
 
+printf("Compilation sucessful\n");
 
-    int token;
-    while ((token = yylex()) != 0) {
-        // Tokens are printed in the action code
-    }
-
-    if (argc > 1) {
-        fclose(yyin);
-    }
-
-    printf("\nLexical analysis complete. Total lines: %d\n", line_num - 1);
-    return 0;
-}
-
-
-
+return 0;}
