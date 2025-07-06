@@ -19,21 +19,27 @@
 # Define some variables for clarity
 FLEX_SOURCE = core/lexer/llexer.l
 FLEX_OUTPUT = core/lexer/lex.yy.c
-C_SOURCES = core/lexer/ldriver.c core/main.c
+BISON_SOURCE = core/parser/pparser.y
+BISON_OUTPUT_C = core/parser/pparser.tab.c
+BISON_OUTPUT_H = core/parser/pparser.tab.h
+C_SOURCES = core/lexer/ldriver.c core/parser/pdriver.c core/main.c
 EXECUTABLE = cc
 
-.PHONY: all lexer clean install
+.PHONY: all lexer parser clean install
 
 all: $(EXECUTABLE)
 
 lexer: $(FLEX_SOURCE)
 	flex -o $(FLEX_OUTPUT) $(FLEX_SOURCE)
 
-$(EXECUTABLE): lexer $(C_SOURCES)
-	gcc -lfl core/main.c  -o $(EXECUTABLE)
+parser: $(BISON_SOURCE)
+	bison -d -o $(BISON_OUTPUT_C) $(BISON_SOURCE)
+
+$(EXECUTABLE): lexer parser $(C_SOURCES)
+	gcc -lfl $(C_SOURCES) $(FLEX_OUTPUT) $(BISON_OUTPUT_C) -o $(EXECUTABLE)
 
 install: $(EXECUTABLE)
 	cp $(EXECUTABLE) .
 
 clean:
-	rm -f $(EXECUTABLE) $(FLEX_OUTPUT)
+	rm -f $(EXECUTABLE) $(FLEX_OUTPUT) $(BISON_OUTPUT_C) $(BISON_OUTPUT_H)
