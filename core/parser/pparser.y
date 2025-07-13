@@ -79,7 +79,7 @@ void cleanup_mlir_module(void);
 %}
 
 %union {
-    char *string;
+    char *sval;
     int integer;
     double floating;
     struct {
@@ -89,10 +89,11 @@ void cleanup_mlir_module(void);
 }
 
 // Token declarations matching the lexer
-%token <string> IDENTIFIER STRING_LITERAL
+%token <sval> IDENTIFIER STRING_LITERAL
 %token <integer> INTEGER_CONSTANT
 %token <floating> FLOATING_CONSTANT
-%token <string> CHARACTER_CONSTANT
+%token <sval> CHARACTER_CONSTANT
+%token <sval> BOOL_LITERAL
 
 // Keywords
 %token AUTO BREAK CASE CHAR CONST CONTINUE DEFAULT DO
@@ -101,6 +102,7 @@ void cleanup_mlir_module(void);
 %token SIZEOF STATIC STRUCT SWITCH TYPEDEF UNION UNSIGNED VOID
 %token VOLATILE WHILE
 %token _BOOL _COMPLEX _IMAGINARY
+%token <sval> TYPEDEF_NAME
 
 // Operators
 %token ARROW INC_OP DEC_OP LEFT_SHIFT RIGHT_SHIFT
@@ -109,7 +111,7 @@ void cleanup_mlir_module(void);
 %token LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN XOR_ASSIGN OR_ASSIGN
 
 // Punctuators
-%token ELLIPSIS
+%token ELLIPSIS HASH DOUBLE_HASH
 
 // Expression types
 %type <expr> expression primary_expression postfix_expression
@@ -136,6 +138,9 @@ void cleanup_mlir_module(void);
 %left '*' '/' '%'
 %right SIZEOF '!' '~' INC_OP DEC_OP UNARY_MINUS UNARY_PLUS
 %left '[' ']' '(' ')' '.' ARROW
+
+%precedence THEN
+%precedence ELSE
 
 %start translation_unit
 
@@ -185,34 +190,36 @@ declaration_specifiers
     {
         $$ = strdup("int");  // Default type
     }
-    | storage_class_specifier declaration_specifiers
-    {
-        $$ = $2;
-    }
     | type_specifier
     {
-        $$ = $1;
-    }
-    | type_specifier declaration_specifiers
-    {
-        free($2);
         $$ = $1;
     }
     | type_qualifier
     {
         $$ = strdup("int");  // Default type
     }
-    | type_qualifier declaration_specifiers
-    {
-        $$ = $2;
-    }
     | function_specifier
     {
         $$ = strdup("int");  // Default type
     }
-    | function_specifier declaration_specifiers
+    | declaration_specifiers storage_class_specifier
     {
-        $$ = $2;
+        $$ = $1; // Keep existing type
+    }
+    | declaration_specifiers type_specifier
+    {
+        // A real implementation would combine e.g. long & int.
+        // For now, just keep the first type found.
+        free($2);
+        $$ = $1;
+    }
+    | declaration_specifiers type_qualifier
+    {
+        $$ = $1; // Keep existing type
+    }
+    | declaration_specifiers function_specifier
+    {
+        $$ = $1; // Keep existing type
     }
     ;
 
@@ -258,7 +265,7 @@ type_specifier
     | _BOOL     { $$ = strdup("i1"); }
     | struct_or_union_specifier { $$ = strdup("ptr"); }
     | enum_specifier { $$ = strdup("i32"); }
-    | typedef_name { $$ = strdup("i32"); }
+    | TYPEDEF_NAME { $$ = strdup("i32"); }
     ;
 
 struct_or_union_specifier
@@ -282,10 +289,10 @@ struct_declaration
     ;
 
 specifier_qualifier_list
-    : type_specifier specifier_qualifier_list
-    | type_specifier
-    | type_qualifier specifier_qualifier_list
+    : type_specifier
     | type_qualifier
+    | specifier_qualifier_list type_specifier
+    | specifier_qualifier_list type_qualifier
     ;
 
 struct_declarator_list
@@ -435,10 +442,6 @@ direct_abstract_declarator
     | direct_abstract_declarator '(' parameter_type_list ')'
     ;
 
-typedef_name
-    : IDENTIFIER
-    ;
-
 initializer
     : assignment_expression
     | '{' initializer_list '}'
@@ -514,7 +517,7 @@ expression_statement
     ;
 
 selection_statement
-    : IF '(' expression ')' statement
+    : IF '(' expression ')' statement %prec THEN
     {
         char *then_label = gen_block_label();
         char *end_label = gen_block_label();
@@ -901,7 +904,7 @@ shift_expression
         char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
         
         emit_operation("  %s = arith.shli %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-    } 
+        
         $$.value = temp;
         $$.type = mlir_type;
         
@@ -951,7 +954,8 @@ additive_expression
         if ($3.value) free($3.value);
         if ($3.type) free($3.type);
     }
-    | additive_expression '-' multiplicative_expression
+    |
+    additive_expression '-' multiplicative_expression
     {
         char *temp = gen_temp();
         char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
@@ -1497,30 +1501,4 @@ void cleanup_mlir_module(void) {
         free(sym);
         sym = next;
     }
-}
-
-int main(int argc, char **argv) {
-    init_mlir_module();
-    
-    if (argc > 1) {
-        yyin = fopen(argv[1], "r");
-        if (!yyin) {
-            fprintf(stderr, "Cannot open file: %s\n", argv[1]);
-            return 1;
-        }
-    }
-    
-    int result = yyparse();
-    
-    if (result == 0) {
-        print_mlir_module();
-    }
-    
-    cleanup_mlir_module();
-    
-    if (yyin && yyin != stdin) {
-        fclose(yyin);
-    }
-    
-    return result;
 }

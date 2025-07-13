@@ -1,1 +1,8 @@
-.fleet/*
+# Ignore the executable
+cc
+
+# Ignore generated files from Flex and Bison
+core/lexer/lex.yy.c
+core/parser/pparser.tab.c
+core/parser/pparser.tab.h
+GEMINI.md

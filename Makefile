@@ -33,13 +33,13 @@ lexer: $(FLEX_SOURCE)
 	flex -o $(FLEX_OUTPUT) $(FLEX_SOURCE)
 
 parser: $(BISON_SOURCE)
-	bison -d -o $(BISON_OUTPUT_C) $(BISON_SOURCE)
+	yacc -d -o $(BISON_OUTPUT_C) $(BISON_SOURCE)
 
 $(EXECUTABLE): lexer parser $(C_SOURCES)
-	gcc -lfl $(C_SOURCES) $(FLEX_OUTPUT) $(BISON_OUTPUT_C) -o $(EXECUTABLE)
+	clang -lfl -Icore/parser $(C_SOURCES) $(FLEX_OUTPUT) $(BISON_OUTPUT_C) -o $(EXECUTABLE)
 
-install: $(EXECUTABLE)
-	cp $(EXECUTABLE) .
+install: all
+	cp $(EXECUTABLE) /usr/local/bin
 
 clean:
 	rm -f $(EXECUTABLE) $(FLEX_OUTPUT) $(BISON_OUTPUT_C) $(BISON_OUTPUT_H)

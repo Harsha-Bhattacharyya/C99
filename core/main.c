@@ -9,10 +9,12 @@ The C++Script project is distributed in the hope that it will be useful, but WIT
 You should have received a copy of the GNU General Public License along with the C++Script project. If not, see <https://www.gnu.org/licenses/>. */
 
 #include "lexer/ldriver.c"
+#include "parser/pdriver.c"
 
 int main(int argc, char *argv[]){
 
 lex(argc, argv); // lexer call
+pars(argc, argv);
 
 printf("Compilation sucessful\n");
 

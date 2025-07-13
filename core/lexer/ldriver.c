@@ -10,7 +10,7 @@ You should have received a copy of the GNU General Public License along with the
 
 #include <stdio.h>
 #include "lex.yy.c"
-#include "pparser.tab.h"
+
 
 // Function to map token codes to their string representations
 const char* token_to_string(int token) {
