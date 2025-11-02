@@ -1,6 +1,6 @@
-#line 1 "core/lexer/lex.yy.c"
+#line 2 "core/lexer/lex.yy.c"
 
-#line 3 "core/lexer/lex.yy.c"
+#line 4 "core/lexer/lex.yy.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -764,7 +764,7 @@ void count_position() {
     }
 }
 
-#line 767 "core/lexer/lex.yy.c"
+#line 768 "core/lexer/lex.yy.c"
 /* 
  * Flex options to configure the generated scanner.
  * noyywrap: Makes the scanner stop when it reaches the end of the file,
@@ -785,7 +785,7 @@ void count_position() {
 /* FS for a floating-point suffix (f, F, l, L) */
 /* IS for an integer suffix (u, l, ll, combinations) */
 /* Whitespace characters to be ignored by the lexer. */
-#line 788 "core/lexer/lex.yy.c"
+#line 789 "core/lexer/lex.yy.c"
 
 #define INITIAL 0
 
@@ -1007,7 +1007,7 @@ YY_DECL
 	{
 #line 90 "core/lexer/llexer.l"
 
-#line 1010 "core/lexer/lex.yy.c"
+#line 1011 "core/lexer/lex.yy.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1604,7 +1604,7 @@ YY_RULE_SETUP
 #line 211 "core/lexer/llexer.l"
 ECHO;
 	YY_BREAK
-#line 1607 "core/lexer/lex.yy.c"
+#line 1608 "core/lexer/lex.yy.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
