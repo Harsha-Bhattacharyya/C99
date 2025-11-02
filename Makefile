@@ -36,7 +36,7 @@ parser: $(BISON_SOURCE)
 	yacc -d -o $(BISON_OUTPUT_C) $(BISON_SOURCE)
 
 $(EXECUTABLE): lexer parser $(C_SOURCES)
-	clang -lfl -Icore/parser $(C_SOURCES) $(FLEX_OUTPUT) $(BISON_OUTPUT_C) -o $(EXECUTABLE)
+	clang -lfl -Icore/parser $(C_SOURCES) -o $(EXECUTABLE)
 
 install: all
 	cp $(EXECUTABLE) /usr/local/bin

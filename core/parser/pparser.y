@@ -120,8 +120,8 @@ void cleanup_mlir_module(void);
 %type <expr> equality_expression and_expression exclusive_or_expression
 %type <expr> inclusive_or_expression logical_and_expression logical_or_expression
 %type <expr> conditional_expression assignment_expression constant_expression
-%type <string> type_specifier declaration_specifiers declarator
-%type <string> direct_declarator parameter_declaration
+%type <sval> type_specifier declaration_specifiers declarator
+%type <sval> direct_declarator parameter_declaration
 
 // Precedence and associativity
 %right '=' MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN XOR_ASSIGN OR_ASSIGN
