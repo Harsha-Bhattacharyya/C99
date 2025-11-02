@@ -4,22 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include "../interpreter.h"
-
-// Global state for LLVM code generation
-static LLVMValueRef current_llvm_function = NULL;
-static LLVMBasicBlockRef current_llvm_block = NULL;
-int temp_counter = 0;
-int block_counter = 0;
-
-// Symbol table for variables
-typedef struct symbol {
-    char *name;
-    char *type;
-    LLVMValueRef llvm_value;
-    struct symbol *next;
-} symbol_t;
-
-symbol_t *symbol_table = NULL;
+#include "codegen.h"
 
 // Function prototypes
 extern int yylex(void);
@@ -29,29 +14,23 @@ extern char *yytext;
 extern int yylineno;
 
 void yyerror(const char *s);
-char *gen_temp(void);
-char *gen_block_label(void);
-void emit_operation(const char *format, ...);  // Stub for compatibility
-void emit_block_start(const char *label);      // Stub for compatibility
 void emit_function_start(const char *name, const char *return_type);
 void emit_function_end(void);
-void add_symbol(const char *name, const char *type);
-symbol_t *lookup_symbol(const char *name);
-LLVMTypeRef c_type_to_llvm(const char *c_type);
 void init_mlir_module(void);
 void print_mlir_module(void);
 void cleanup_mlir_module(void);
 
 %}
 
+%code requires {
+#include "codegen.h"
+}
+
 %union {
     char *sval;
     int integer;
     double floating;
-    struct {
-        char *value;
-        char *type;
-    } expr;
+    ExprValue expr;
 }
 
 // Token declarations matching the lexer
@@ -123,16 +102,22 @@ external_declaration
     ;
 
 function_definition
-    : declaration_specifiers declarator compound_statement
+    : declaration_specifiers declarator 
     {
         emit_function_start($2, $1);
+    }
+    compound_statement
+    {
         emit_function_end();
         free($1);
         free($2);
     }
-    | declarator compound_statement
+    | declarator
     {
         emit_function_start($1, "i32");  // Default return type
+    }
+    compound_statement
+    {
         emit_function_end();
         free($1);
     }
@@ -195,13 +180,18 @@ init_declarator_list
 init_declarator
     : declarator
     {
-        // Add variable declaration
-        add_symbol($1, "i32");
+        // Create variable allocation
+        if (codegen_ctx && codegen_ctx->current_function) {
+            LLVMValueRef alloca = codegen_create_variable($1, get_c_type("i32"));
+        }
         free($1);
     }
     | declarator '=' initializer
     {
-        add_symbol($1, "i32");
+        // Create variable with initialization (TODO: use initializer value)
+        if (codegen_ctx && codegen_ctx->current_function) {
+            LLVMValueRef alloca = codegen_create_variable($1, get_c_type("i32"));
+        }
         free($1);
     }
     ;
@@ -439,11 +429,17 @@ statement
 labeled_statement
     : IDENTIFIER ':' statement
     {
-        emit_operation("^%s:", $1);
+        // TODO: Implement labeled statement in Phase 2
         free($1);
     }
     | CASE constant_expression ':' statement
+    {
+        // TODO: Implement case statement in Phase 2
+    }
     | DEFAULT ':' statement
+    {
+        // TODO: Implement default statement in Phase 2
+    }
     ;
 
 compound_statement
@@ -477,107 +473,66 @@ expression_statement
 selection_statement
     : IF '(' expression ')' statement %prec THEN
     {
-        char *then_label = gen_block_label();
-        char *end_label = gen_block_label();
-        
-        emit_operation("  cf.cond_br %s, ^%s, ^%s", $3.value, then_label, end_label);
-        emit_block_start(then_label);
-        emit_operation("  cf.br ^%s", end_label);
-        emit_block_start(end_label);
-        
-        free($3.value);
-        free($3.type);
-        free(then_label);
-        free(end_label);
+        // TODO: Implement if statement code generation in Phase 2
     }
     | IF '(' expression ')' statement ELSE statement
     {
-        char *then_label = gen_block_label();
-        char *else_label = gen_block_label();
-        char *end_label = gen_block_label();
-        
-        emit_operation("  cf.cond_br %s, ^%s, ^%s", $3.value, then_label, else_label);
-        emit_block_start(then_label);
-        emit_operation("  cf.br ^%s", end_label);
-        emit_block_start(else_label);
-        emit_operation("  cf.br ^%s", end_label);
-        emit_block_start(end_label);
-        
-        free($3.value);
-        free($3.type);
-        free(then_label);
-        free(else_label);
-        free(end_label);
+        // TODO: Implement if/else statement code generation in Phase 2
     }
     | SWITCH '(' expression ')' statement
     {
-        free($3.value);
-        free($3.type);
+        // TODO: Implement switch statement code generation in Phase 2
     }
     ;
 
 iteration_statement
     : WHILE '(' expression ')' statement
     {
-        char *loop_label = gen_block_label();
-        char *body_label = gen_block_label();
-        char *end_label = gen_block_label();
-        
-        emit_operation("  cf.br ^%s", loop_label);
-        emit_block_start(loop_label);
-        emit_operation("  cf.cond_br %s, ^%s, ^%s", $3.value, body_label, end_label);
-        emit_block_start(body_label);
-        emit_operation("  cf.br ^%s", loop_label);
-        emit_block_start(end_label);
-        
-        free($3.value);
-        free($3.type);
-        free(loop_label);
-        free(body_label);
-        free(end_label);
+        // TODO: Implement while loop code generation in Phase 2
     }
     | DO statement WHILE '(' expression ')' ';'
     {
-        free($5.value);
-        free($5.type);
+        // TODO: Implement do-while loop code generation in Phase 2
     }
     | FOR '(' expression_statement expression_statement ')' statement
+    {
+        // TODO: Implement for loop code generation in Phase 2
+    }
     | FOR '(' expression_statement expression_statement expression ')' statement
     {
-        free($5.value);
-        free($5.type);
+        // TODO: Implement for loop code generation in Phase 2
     }
     | FOR '(' declaration expression_statement ')' statement
+    {
+        // TODO: Implement for loop with declaration code generation in Phase 2
+    }
     | FOR '(' declaration expression_statement expression ')' statement
     {
-        free($5.value);
-        free($5.type);
+        // TODO: Implement for loop with declaration code generation in Phase 2
     }
     ;
 
 jump_statement
     : GOTO IDENTIFIER ';'
     {
-        emit_operation("  cf.br ^%s", $2);
+        // GOTO - would need label management for full implementation
         free($2);
     }
     | CONTINUE ';'
     {
-        emit_operation("  cf.br ^continue");
+        // CONTINUE - would need loop block tracking for full implementation
     }
     | BREAK ';'
     {
-        emit_operation("  cf.br ^break");
+        // BREAK - would need loop/switch block tracking for full implementation
     }
     | RETURN ';'
     {
-        emit_operation("  return");
+        codegen_return_void();
     }
     | RETURN expression ';'
     {
-        emit_operation("  return %s : %s", $2.value, $2.type);
-        free($2.value);
-        free($2.type);
+        codegen_return($2);
     }
     ;
 
@@ -588,9 +543,7 @@ expression
     }
     | expression ',' assignment_expression
     {
-        // Use the right operand as the result
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
+        // Comma operator - evaluate both, return right operand
         $$ = $3;
     }
     ;
@@ -602,18 +555,8 @@ assignment_expression
     }
     | unary_expression assignment_operator assignment_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  store %s, %s : memref<%s>", $3.value, $1.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        // TODO: Implement assignment operators in Phase 2
+        $$ = $3;
     }
     ;
 
@@ -629,20 +572,8 @@ conditional_expression
     }
     | logical_or_expression '?' expression ':' conditional_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $3.type ? strdup($3.type) : strdup("i32");
-        
-        emit_operation("  %s = select %s, %s, %s : %s", temp, $1.value, $3.value, $5.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
-        if ($5.value) free($5.value);
-        if ($5.type) free($5.type);
+        // TODO: Implement ternary operator in Phase 2
+        $$ = $1;
     }
     ;
 
@@ -660,16 +591,8 @@ logical_or_expression
     }
     | logical_or_expression OR_OP logical_and_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.ori %s, %s : i1", temp, $1.value, $3.value);
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        // TODO: Implement logical OR in Phase 2
+        $$ = $1;
     }
     ;
 
@@ -680,16 +603,8 @@ logical_and_expression
     }
     | logical_and_expression AND_OP inclusive_or_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.andi %s, %s : i1", temp, $1.value, $3.value);
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        // TODO: Implement logical AND in Phase 2
+        $$ = $1;
     }
     ;
 
@@ -700,18 +615,7 @@ inclusive_or_expression
     }
     | inclusive_or_expression '|' exclusive_or_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.ori %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("|", $1, $3);
     }
     ;
 
@@ -722,18 +626,7 @@ exclusive_or_expression
     }
     | exclusive_or_expression '^' and_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.xori %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("^", $1, $3);
     }
     ;
 
@@ -744,18 +637,7 @@ and_expression
     }
     | and_expression '&' equality_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.andi %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("&", $1, $3);
     }
     ;
 
@@ -766,29 +648,11 @@ equality_expression
     }
     | equality_expression EQ_OP relational_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.cmpi eq, %s, %s : %s", temp, $1.value, $3.value, $1.type ? $1.type : "i32");
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("==", $1, $3);
     }
     | equality_expression NE_OP relational_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.cmpi ne, %s, %s : %s", temp, $1.value, $3.value, $1.type ? $1.type : "i32");
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("!=", $1, $3);
     }
     ;
 
@@ -799,55 +663,19 @@ relational_expression
     }
     | relational_expression '<' shift_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.cmpi slt, %s, %s : %s", temp, $1.value, $3.value, $1.type ? $1.type : "i32");
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("<", $1, $3);
     }
     | relational_expression '>' shift_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.cmpi sgt, %s, %s : %s", temp, $1.value, $3.value, $1.type ? $1.type : "i32");
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op(">", $1, $3);
     }
     | relational_expression LE_OP shift_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.cmpi sle, %s, %s : %s", temp, $1.value, $3.value, $1.type ? $1.type : "i32");
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("<=", $1, $3);
     }
     | relational_expression GE_OP shift_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.cmpi sge, %s, %s : %s", temp, $1.value, $3.value, $1.type ? $1.type : "i32");
-        
-        $$.value = temp;
-        $$.type = strdup("i1");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op(">=", $1, $3);
     }
     ;
 
@@ -858,33 +686,11 @@ shift_expression
     }
     | shift_expression LEFT_SHIFT additive_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.shli %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("<<", $1, $3);
     }
     | shift_expression RIGHT_SHIFT additive_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.shrsi %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op(">>", $1, $3);
     }
     ;
 
@@ -895,42 +701,11 @@ additive_expression
     }
     | additive_expression '+' multiplicative_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        if (strstr(mlir_type, "f")) {
-            emit_operation("  %s = arith.addf %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        } else {
-            emit_operation("  %s = arith.addi %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        }
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("+", $1, $3);
     }
-    |
-    additive_expression '-' multiplicative_expression
+    | additive_expression '-' multiplicative_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        if (strstr(mlir_type, "f")) {
-            emit_operation("  %s = arith.subf %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        } else {
-          emit_operation("  %s = arith.subi %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        }
-
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("-", $1, $3);
     }
     ;
 
@@ -941,56 +716,15 @@ multiplicative_expression
     }
     | multiplicative_expression '*' cast_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        if (strstr(mlir_type, "f")) {
-            emit_operation("  %s = arith.mulf %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        } else {
-            emit_operation("  %s = arith.muli %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        }
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("*", $1, $3);
     }
     | multiplicative_expression '/' cast_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        if (strstr(mlir_type, "f")) {
-            emit_operation("  %s = arith.divf %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        } else {
-            emit_operation("  %s = arith.divsi %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        }
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("/", $1, $3);
     }
     | multiplicative_expression '%' cast_expression
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.remsi %s, %s : %s", temp, $1.value, $3.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        $$ = codegen_binary_op("%", $1, $3);
     }
     ;
 
@@ -1014,58 +748,28 @@ unary_expression
     }
     | INC_OP unary_expression
     {
-        char *temp = gen_temp();
-        char *one_temp = gen_temp();
-        char *mlir_type = $2.type ? strdup($2.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.constant 1 : %s", one_temp, mlir_type);
-        emit_operation("  %s = arith.addi %s, %s : %s", temp, $2.value, one_temp, mlir_type);
-        emit_operation("  store %s, %s : memref<%s>", temp, $2.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($2.value) free($2.value);
-        if ($2.type) free($2.type);
+        // TODO: Implement increment operator in Phase 2
+        $$ = $2;
     }
     | DEC_OP unary_expression
     {
-        char *temp = gen_temp();
-        char *one_temp = gen_temp();
-        char *mlir_type = $2.type ? strdup($2.type) : strdup("i32");
-        
-        emit_operation("  %s = arith.constant 1 : %s", one_temp, mlir_type);
-        emit_operation("  %s = arith.subi %s, %s : %s", temp, $2.value, one_temp, mlir_type);
-        emit_operation("  store %s, %s : memref<%s>", temp, $2.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($2.value) free($2.value);
-        if ($2.type) free($2.type);
+        // TODO: Implement decrement operator in Phase 2
+        $$ = $2;
     }
     | unary_operator cast_expression
     {
-        $$ = $2; // For now, just pass through
+        // TODO: Implement unary operators in Phase 2
+        $$ = $2;
     }
     | SIZEOF unary_expression
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.constant 4 : i32", temp); // Simplified sizeof
-        
-        $$.value = temp;
-        $$.type = strdup("i32");
-        
-        if ($2.value) free($2.value);
-        if ($2.type) free($2.type);
+        // TODO: Implement sizeof operator in Phase 2
+        $$ = codegen_integer_constant(4);  // Simplified sizeof returns 4
     }
     | SIZEOF '(' type_name ')'
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.constant 4 : i32", temp); // Simplified sizeof
-        
-        $$.value = temp;
-        $$.type = strdup("i32");
+        // TODO: Implement sizeof operator in Phase 2
+        $$ = codegen_integer_constant(4);  // Simplified sizeof returns 4
     }
     ;
 
@@ -1080,114 +784,50 @@ postfix_expression
     }
     | postfix_expression '[' expression ']'
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = memref.load %s[%s] : memref<?x%s>", temp, $1.value, $3.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
-        if ($3.value) free($3.value);
-        if ($3.type) free($3.type);
+        // TODO: Implement array access in Phase 3
+        $$ = $1;
     }
     | postfix_expression '(' ')'
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = call @%s() : () -> i32", temp, $1.value);
-        
-        $$.value = temp;
-        $$.type = strdup("i32");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
+        // TODO: Implement function calls in Phase 3
+        $$ = codegen_integer_constant(0);
     }
     | postfix_expression '(' argument_expression_list ')'
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = call @%s() : () -> i32", temp, $1.value); // Simplified
-        
-        $$.value = temp;
-        $$.type = strdup("i32");
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
+        // TODO: Implement function calls with arguments in Phase 3
+        $$ = codegen_integer_constant(0);
     }
     | postfix_expression '.' IDENTIFIER
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = memref.load %s : memref<%s>", temp, $1.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
+        // TODO: Implement struct member access in Phase 3
         free($3);
+        $$ = $1;
     }
     | postfix_expression ARROW IDENTIFIER
     {
-        char *temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = memref.load %s : memref<%s>", temp, $1.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
+        // TODO: Implement pointer member access in Phase 3
         free($3);
+        $$ = $1;
     }
     | postfix_expression INC_OP
     {
-        char *temp = gen_temp();
-        char *one_temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = memref.load %s : memref<%s>", temp, $1.value, mlir_type);
-        emit_operation("  %s = arith.constant 1 : %s", one_temp, mlir_type);
-        emit_operation("  %s = arith.addi %s, %s : %s", temp, temp, one_temp, mlir_type);
-        emit_operation("  store %s, %s : memref<%s>", temp, $1.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
+        // TODO: Implement post-increment in Phase 2
+        $$ = $1;
     }
     | postfix_expression DEC_OP
     {
-        char *temp = gen_temp();
-        char *one_temp = gen_temp();
-        char *mlir_type = $1.type ? strdup($1.type) : strdup("i32");
-        
-        emit_operation("  %s = memref.load %s : memref<%s>", temp, $1.value, mlir_type);
-        emit_operation("  %s = arith.constant 1 : %s", one_temp, mlir_type);
-        emit_operation("  %s = arith.subi %s, %s : %s", temp, temp, one_temp, mlir_type);
-        emit_operation("  store %s, %s : memref<%s>", temp, $1.value, mlir_type);
-        
-        $$.value = temp;
-        $$.type = mlir_type;
-        
-        if ($1.value) free($1.value);
-        if ($1.type) free($1.type);
+        // TODO: Implement post-decrement in Phase 2
+        $$ = $1;
     }
     | '(' type_name ')' '{' initializer_list '}'
     {
-        char *temp = gen_temp();
-        $$.value = temp;
-        $$.type = strdup("i32");
+        // TODO: Implement compound literals in Phase 3
+        $$ = codegen_integer_constant(0);
     }
     | '(' type_name ')' '{' initializer_list ',' '}'
     {
-        char *temp = gen_temp();
-        $$.value = temp;
-        $$.type = strdup("i32");
+        // TODO: Implement compound literals in Phase 3
+        $$ = codegen_integer_constant(0);
     }
     ;
 
@@ -1207,47 +847,34 @@ argument_expression_list
 primary_expression
     : IDENTIFIER
     {
-        symbol_t *sym = lookup_symbol($1);
-        if (sym) {
-            char *temp = gen_temp();
-            emit_operation("  %s = memref.load %%%s : memref<%s>", temp, sym->name, sym->type);
-            $$.value = temp;
-            $$.type = strdup(sym->type);
-        } else {
-            $$.value = strdup($1);
-            $$.type = strdup("i32");
-        }
+        $$ = codegen_load_variable($1);
         free($1);
     }
     | INTEGER_CONSTANT
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.constant %d : i32", temp, $1);
-        $$.value = temp;
-        $$.type = strdup("i32");
+        $$ = codegen_integer_constant($1);
     }
     | FLOATING_CONSTANT
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.constant %f : f64", temp, $1);
-        $$.value = temp;
-        $$.type = strdup("f64");
+        $$ = codegen_float_constant($1);
     }
     | CHARACTER_CONSTANT
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = arith.constant %s : i8", temp, $1);
-        $$.value = temp;
-        $$.type = strdup("i8");
+        int char_val = ($1 && $1[0]) ? (int)$1[0] : 0;
+        ExprValue result;
+        result.value = LLVMConstInt(LLVMInt8TypeInContext(get_llvm_context()), char_val, 0);
+        result.type = LLVMInt8TypeInContext(get_llvm_context());
         free($1);
+        $$ = result;
     }
     | STRING_LITERAL
     {
-        char *temp = gen_temp();
-        emit_operation("  %s = memref.get_global @str_literal : memref<?xi8>", temp);
-        $$.value = temp;
-        $$.type = strdup("memref<?xi8>");
+        // String literals - for now return null pointer
+        ExprValue result;
+        result.value = LLVMConstPointerNull(LLVMPointerType(LLVMInt8TypeInContext(get_llvm_context()), 0));
+        result.type = LLVMPointerType(LLVMInt8TypeInContext(get_llvm_context()), 0);
         free($1);
+        $$ = result;
     }
     | '(' expression ')'
     {
@@ -1262,120 +889,24 @@ void yyerror(const char *s) {
     fprintf(stderr, "Parse error at line %d: %s\n", yylineno, s);
 }
 
-char *gen_temp(void) {
-    char *temp = malloc(16);
-    snprintf(temp, 16, "t%d", temp_counter++);
-    return temp;
-}
-
-char *gen_block_label(void) {
-    char *label = malloc(16);
-    snprintf(label, 16, "bb%d", block_counter++);
-    return label;
-}
-
-// Stub functions for compatibility with old MLIR code
-void emit_operation(const char *format, ...) {
-    // These operations are no longer needed for LLVM
-    // Left as stubs for compatibility
-}
-
-void emit_block_start(const char *label) {
-    // Block creation is now handled differently in LLVM
-    // Left as stub for compatibility
-}
-
 void emit_function_start(const char *name, const char *return_type) {
-    // Convert return type to LLVM type
-    LLVMTypeRef ret_type = c_type_to_llvm(return_type);
-    
-    // Create function with no parameters for now
-    current_llvm_function = gen_function(name, ret_type, NULL, 0);
-    
-    // Create entry block
-    current_llvm_block = gen_basic_block(current_llvm_function, "entry");
-    LLVMPositionBuilderAtEnd(get_llvm_builder(), current_llvm_block);
+    LLVMTypeRef ret_type = get_c_type(return_type);
+    codegen_function_start(name, ret_type, NULL, 0);
 }
 
 void emit_function_end(void) {
-    // If the current block doesn't have a terminator, add a return
-    if (current_llvm_block && !LLVMGetBasicBlockTerminator(current_llvm_block)) {
-        LLVMTypeRef func_type = LLVMGlobalGetValueType(current_llvm_function);
-        LLVMTypeRef ret_type = LLVMGetReturnType(func_type);
-        if (LLVMGetTypeKind(ret_type) == LLVMVoidTypeKind) {
-            gen_return_void();
-        } else {
-            // Return 0 as default
-            gen_return(gen_int_constant(0, 32));
-        }
-    }
-    current_llvm_function = NULL;
-    current_llvm_block = NULL;
-}
-
-void add_symbol(const char *name, const char *type) {
-    symbol_t *sym = malloc(sizeof(symbol_t));
-    sym->name = strdup(name);
-    sym->type = strdup(type);
-    sym->llvm_value = NULL;
-    sym->next = symbol_table;
-    symbol_table = sym;
-}
-
-symbol_t *lookup_symbol(const char *name) {
-    symbol_t *sym = symbol_table;
-    while (sym) {
-        if (strcmp(sym->name, name) == 0) {
-            return sym;
-        }
-        sym = sym->next;
-    }
-    return NULL;
-}
-
-LLVMTypeRef c_type_to_llvm(const char *c_type) {
-    LLVMContextRef ctx = get_llvm_context();
-    if (strcmp(c_type, "void") == 0 || strcmp(c_type, "()") == 0) 
-        return LLVMVoidTypeInContext(ctx);
-    if (strcmp(c_type, "i8") == 0 || strcmp(c_type, "char") == 0) 
-        return LLVMInt8TypeInContext(ctx);
-    if (strcmp(c_type, "i16") == 0 || strcmp(c_type, "short") == 0) 
-        return LLVMInt16TypeInContext(ctx);
-    if (strcmp(c_type, "i32") == 0 || strcmp(c_type, "int") == 0) 
-        return LLVMInt32TypeInContext(ctx);
-    if (strcmp(c_type, "i64") == 0 || strcmp(c_type, "long") == 0) 
-        return LLVMInt64TypeInContext(ctx);
-    if (strcmp(c_type, "f32") == 0 || strcmp(c_type, "float") == 0) 
-        return LLVMFloatTypeInContext(ctx);
-    if (strcmp(c_type, "f64") == 0 || strcmp(c_type, "double") == 0) 
-        return LLVMDoubleTypeInContext(ctx);
-    if (strcmp(c_type, "i1") == 0 || strcmp(c_type, "_Bool") == 0) 
-        return LLVMInt1TypeInContext(ctx);
-    return LLVMInt32TypeInContext(ctx); // Default to i32
+    codegen_function_end();
 }
 
 // Wrapper functions to maintain compatibility with pdriver.c
 void init_mlir_module(void) {
-    // Just call interpreter_init - pdriver already does this
-    // This function is kept for compatibility but does nothing
+    // Handled by codegen_init in pdriver
 }
 
 void print_mlir_module(void) {
-    // Just call interpreter_execute - pdriver already does this
-    // This function is kept for compatibility but does nothing  
+    // Handled by interpreter_execute in pdriver
 }
 
 void cleanup_mlir_module(void) {
-    // Cleanup symbol table
-    symbol_t *sym = symbol_table;
-    while (sym) {
-        symbol_t *next = sym->next;
-        free(sym->name);
-        free(sym->type);
-        free(sym);
-        sym = next;
-    }
-    symbol_table = NULL;
-    
-    // interpreter_cleanup is called by pdriver
+    // Handled by codegen_cleanup in pdriver
 }
