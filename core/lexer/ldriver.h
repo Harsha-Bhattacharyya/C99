@@ -8,21 +8,9 @@ The C++Script project is distributed in the hope that it will be useful, but WIT
 
 You should have received a copy of the GNU General Public License along with the C++Script project. If not, see <https://www.gnu.org/licenses/>. */
 
-#include <stdio.h>
-#include "lexer/ldriver.h"
-#include "parser/pdriver.h"
+#ifndef LDRIVER_H
+#define LDRIVER_H
 
-int main(int argc, char *argv[]){
+int lex(int argc, char* argv[]);
 
-// Only parse - lexing is done automatically by the parser
-int result = pars(argc, argv);
-
-if (result == 0) {
-    printf("Compilation successful\n");
-} else {
-    fprintf(stderr, "Compilation failed\n");
-    return 1;
-}
-
-return 0;
-}
+#endif // LDRIVER_H
