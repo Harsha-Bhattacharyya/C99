@@ -1,18 +1,23 @@
 #include "pparser.tab.c"
 #include "../interpreter.h"
+#include "codegen.h"
 #include <stdio.h>
 
 extern FILE *yyin;
 
 int pars(int argc, char *argv[]) {
-    // Initialize LLVM interpreter instead of MLIR module
+    // Initialize LLVM interpreter
     interpreter_init();
+    
+    // Initialize code generation
+    codegen_init();
     
     // Open input file if provided
     if (argc > 1) {
         yyin = fopen(argv[1], "r");
         if (!yyin) {
             perror(argv[1]);
+            codegen_cleanup();
             interpreter_cleanup();
             return 1;
         }
@@ -25,6 +30,7 @@ int pars(int argc, char *argv[]) {
         result = interpreter_execute();
     }
     
+    codegen_cleanup();
     interpreter_cleanup();
     
     if (yyin && yyin != stdin) {
