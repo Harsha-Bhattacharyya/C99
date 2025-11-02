@@ -3,45 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include "../interpreter.h"
 
-// MLIR Generation Support
-typedef struct mlir_value {
-    char *name;
-    char *type;
-    int is_temp;
-    int temp_id;
-} mlir_value_t;
-
-typedef struct mlir_block {
-    char *label;
-    char **operations;
-    int op_count;
-    int op_capacity;
-} mlir_block_t;
-
-typedef struct mlir_function {
-    char *name;
-    char *return_type;
-    char **params;
-    int param_count;
-    mlir_block_t *blocks;
-    int block_count;
-    int block_capacity;
-} mlir_function_t;
-
-typedef struct mlir_module {
-    mlir_function_t *functions;
-    int func_count;
-    int func_capacity;
-    char **global_decls;
-    int global_count;
-    int global_capacity;
-} mlir_module_t;
-
-// Global MLIR context
-mlir_module_t *current_module;
-mlir_function_t *current_function;
-mlir_block_t *current_block;
+// Global state for LLVM code generation
+static LLVMValueRef current_llvm_function = NULL;
+static LLVMBasicBlockRef current_llvm_block = NULL;
 int temp_counter = 0;
 int block_counter = 0;
 
@@ -49,7 +15,7 @@ int block_counter = 0;
 typedef struct symbol {
     char *name;
     char *type;
-    char *mlir_name;
+    LLVMValueRef llvm_value;
     struct symbol *next;
 } symbol_t;
 
@@ -65,13 +31,13 @@ extern int yylineno;
 void yyerror(const char *s);
 char *gen_temp(void);
 char *gen_block_label(void);
-void emit_operation(const char *format, ...);
+void emit_operation(const char *format, ...);  // Stub for compatibility
+void emit_block_start(const char *label);      // Stub for compatibility
 void emit_function_start(const char *name, const char *return_type);
 void emit_function_end(void);
-void emit_block_start(const char *label);
 void add_symbol(const char *name, const char *type);
 symbol_t *lookup_symbol(const char *name);
-char *c_type_to_mlir(const char *c_type);
+LLVMTypeRef c_type_to_llvm(const char *c_type);
 void init_mlir_module(void);
 void print_mlir_module(void);
 void cleanup_mlir_module(void);
@@ -159,12 +125,10 @@ external_declaration
 function_definition
     : declaration_specifiers declarator compound_statement
     {
-        char *return_type = c_type_to_mlir($1);
-        emit_function_start($2, return_type);
+        emit_function_start($2, $1);
         emit_function_end();
         free($1);
         free($2);
-        free(return_type);
     }
     | declarator compound_statement
     {
@@ -231,20 +195,14 @@ init_declarator_list
 init_declarator
     : declarator
     {
-        // Add variable declaration to MLIR
-        char *mlir_type = c_type_to_mlir("int");  // Default for now
-        emit_operation("  %%%s = alloca %s", $1, mlir_type);
-        add_symbol($1, "int");
+        // Add variable declaration
+        add_symbol($1, "i32");
         free($1);
-        free(mlir_type);
     }
     | declarator '=' initializer
     {
-        char *mlir_type = c_type_to_mlir("int");
-        emit_operation("  %%%s = alloca %s", $1, mlir_type);
-        add_symbol($1, "int");
+        add_symbol($1, "i32");
         free($1);
-        free(mlir_type);
     }
     ;
 
@@ -1252,7 +1210,7 @@ primary_expression
         symbol_t *sym = lookup_symbol($1);
         if (sym) {
             char *temp = gen_temp();
-            emit_operation("  %s = memref.load %%%s : memref<%s>", temp, sym->mlir_name, sym->type);
+            emit_operation("  %s = memref.load %%%s : memref<%s>", temp, sym->name, sym->type);
             $$.value = temp;
             $$.type = strdup(sym->type);
         } else {
@@ -1306,7 +1264,7 @@ void yyerror(const char *s) {
 
 char *gen_temp(void) {
     char *temp = malloc(16);
-    snprintf(temp, 16, "%%t%d", temp_counter++);
+    snprintf(temp, 16, "t%d", temp_counter++);
     return temp;
 }
 
@@ -1316,80 +1274,50 @@ char *gen_block_label(void) {
     return label;
 }
 
+// Stub functions for compatibility with old MLIR code
 void emit_operation(const char *format, ...) {
-    if (!current_block) return;
-    
-    va_list args;
-    va_start(args, format);
-    
-    // Expand operations array if needed
-    if (current_block->op_count >= current_block->op_capacity) {
-        current_block->op_capacity = current_block->op_capacity ? current_block->op_capacity * 2 : 16;
-        current_block->operations = realloc(current_block->operations, 
-                                           sizeof(char*) * current_block->op_capacity);
-    }
-    
-    // Allocate and format the operation string
-    char *op = malloc(512);
-    vsnprintf(op, 512, format, args);
-    current_block->operations[current_block->op_count++] = op;
-    
-    va_end(args);
-}
-
-void emit_function_start(const char *name, const char *return_type) {
-    if (!current_module) return;
-    
-    // Expand functions array if needed
-    if (current_module->func_count >= current_module->func_capacity) {
-        current_module->func_capacity = current_module->func_capacity ? current_module->func_capacity * 2 : 8;
-        current_module->functions = realloc(current_module->functions, 
-                                           sizeof(mlir_function_t) * current_module->func_capacity);
-    }
-    
-    current_function = &current_module->functions[current_module->func_count++];
-    current_function->name = strdup(name);
-    current_function->return_type = strdup(return_type);
-    current_function->params = NULL;
-    current_function->param_count = 0;
-    current_function->blocks = NULL;
-    current_function->block_count = 0;
-    current_function->block_capacity = 0;
-    
-    // Create entry block
-    emit_block_start("entry");
-}
-
-void emit_function_end(void) {
-    if (current_function && current_block) {
-        emit_operation("  return");
-    }
-    current_function = NULL;
-    current_block = NULL;
+    // These operations are no longer needed for LLVM
+    // Left as stubs for compatibility
 }
 
 void emit_block_start(const char *label) {
-    if (!current_function) return;
+    // Block creation is now handled differently in LLVM
+    // Left as stub for compatibility
+}
+
+void emit_function_start(const char *name, const char *return_type) {
+    // Convert return type to LLVM type
+    LLVMTypeRef ret_type = c_type_to_llvm(return_type);
     
-    // Expand blocks array if needed
-    if (current_function->block_count >= current_function->block_capacity) {
-        current_function->block_capacity = current_function->block_capacity ? current_function->block_capacity * 2 : 8;
-        current_function->blocks = realloc(current_function->blocks, 
-                                          sizeof(mlir_block_t) * current_function->block_capacity);
+    // Create function with no parameters for now
+    current_llvm_function = gen_function(name, ret_type, NULL, 0);
+    
+    // Create entry block
+    current_llvm_block = gen_basic_block(current_llvm_function, "entry");
+    LLVMPositionBuilderAtEnd(get_llvm_builder(), current_llvm_block);
+}
+
+void emit_function_end(void) {
+    // If the current block doesn't have a terminator, add a return
+    if (current_llvm_block && !LLVMGetBasicBlockTerminator(current_llvm_block)) {
+        LLVMTypeRef func_type = LLVMGlobalGetValueType(current_llvm_function);
+        LLVMTypeRef ret_type = LLVMGetReturnType(func_type);
+        if (LLVMGetTypeKind(ret_type) == LLVMVoidTypeKind) {
+            gen_return_void();
+        } else {
+            // Return 0 as default
+            gen_return(gen_int_constant(0, 32));
+        }
     }
-    
-    current_block = &current_function->blocks[current_function->block_count++];
-    current_block->label = strdup(label);
-    current_block->operations = NULL;
-    current_block->op_count = 0;
-    current_block->op_capacity = 0;
+    current_llvm_function = NULL;
+    current_llvm_block = NULL;
 }
 
 void add_symbol(const char *name, const char *type) {
     symbol_t *sym = malloc(sizeof(symbol_t));
     sym->name = strdup(name);
     sym->type = strdup(type);
-    sym->mlir_name = strdup(name);
+    sym->llvm_value = NULL;
     sym->next = symbol_table;
     symbol_table = sym;
 }
@@ -1405,100 +1333,49 @@ symbol_t *lookup_symbol(const char *name) {
     return NULL;
 }
 
-char *c_type_to_mlir(const char *c_type) {
-    if (strcmp(c_type, "void") == 0) return strdup("()");
-    if (strcmp(c_type, "char") == 0) return strdup("i8");
-    if (strcmp(c_type, "short") == 0) return strdup("i16");
-    if (strcmp(c_type, "int") == 0) return strdup("i32");
-    if (strcmp(c_type, "long") == 0) return strdup("i64");
-    if (strcmp(c_type, "float") == 0) return strdup("f32");
-    if (strcmp(c_type, "double") == 0) return strdup("f64");
-    if (strcmp(c_type, "_Bool") == 0) return strdup("i1");
-    return strdup("i32"); // Default
+LLVMTypeRef c_type_to_llvm(const char *c_type) {
+    LLVMContextRef ctx = get_llvm_context();
+    if (strcmp(c_type, "void") == 0 || strcmp(c_type, "()") == 0) 
+        return LLVMVoidTypeInContext(ctx);
+    if (strcmp(c_type, "i8") == 0 || strcmp(c_type, "char") == 0) 
+        return LLVMInt8TypeInContext(ctx);
+    if (strcmp(c_type, "i16") == 0 || strcmp(c_type, "short") == 0) 
+        return LLVMInt16TypeInContext(ctx);
+    if (strcmp(c_type, "i32") == 0 || strcmp(c_type, "int") == 0) 
+        return LLVMInt32TypeInContext(ctx);
+    if (strcmp(c_type, "i64") == 0 || strcmp(c_type, "long") == 0) 
+        return LLVMInt64TypeInContext(ctx);
+    if (strcmp(c_type, "f32") == 0 || strcmp(c_type, "float") == 0) 
+        return LLVMFloatTypeInContext(ctx);
+    if (strcmp(c_type, "f64") == 0 || strcmp(c_type, "double") == 0) 
+        return LLVMDoubleTypeInContext(ctx);
+    if (strcmp(c_type, "i1") == 0 || strcmp(c_type, "_Bool") == 0) 
+        return LLVMInt1TypeInContext(ctx);
+    return LLVMInt32TypeInContext(ctx); // Default to i32
 }
 
+// Wrapper functions to maintain compatibility with pdriver.c
 void init_mlir_module(void) {
-    current_module = malloc(sizeof(mlir_module_t));
-    current_module->functions = NULL;
-    current_module->func_count = 0;
-    current_module->func_capacity = 0;
-    current_module->global_decls = NULL;
-    current_module->global_count = 0;
-    current_module->global_capacity = 0;
+    // Just call interpreter_init - pdriver already does this
+    // This function is kept for compatibility but does nothing
 }
 
 void print_mlir_module(void) {
-    if (!current_module) return;
-    
-    printf("module {\n");
-    
-    // Print global declarations
-    for (int i = 0; i < current_module->global_count; i++) {
-        printf("  %s\n", current_module->global_decls[i]);
-    }
-    
-    // Print functions
-    for (int i = 0; i < current_module->func_count; i++) {
-        mlir_function_t *func = &current_module->functions[i];
-        printf("  func.func @%s() -> %s {\n", func->name, func->return_type);
-        
-        // Print blocks
-        for (int j = 0; j < func->block_count; j++) {
-            mlir_block_t *block = &func->blocks[j];
-            printf("  ^%s:\n", block->label);
-            
-            // Print operations
-            for (int k = 0; k < block->op_count; k++) {
-                printf("%s\n", block->operations[k]);
-            }
-        }
-        
-        printf("  }\n");
-    }
-    
-    printf("}\n");
+    // Just call interpreter_execute - pdriver already does this
+    // This function is kept for compatibility but does nothing  
 }
 
 void cleanup_mlir_module(void) {
-    if (!current_module) return;
-    
-    // Cleanup functions
-    for (int i = 0; i < current_module->func_count; i++) {
-        mlir_function_t *func = &current_module->functions[i];
-        free(func->name);
-        free(func->return_type);
-        
-        // Cleanup blocks
-        for (int j = 0; j < func->block_count; j++) {
-            mlir_block_t *block = &func->blocks[j];
-            free(block->label);
-            
-            // Cleanup operations
-            for (int k = 0; k < block->op_count; k++) {
-                free(block->operations[k]);
-            }
-            free(block->operations);
-        }
-        free(func->blocks);
-    }
-    free(current_module->functions);
-    
-    // Cleanup global declarations
-    for (int i = 0; i < current_module->global_count; i++) {
-        free(current_module->global_decls[i]);
-    }
-    free(current_module->global_decls);
-    
-    free(current_module);
-    
     // Cleanup symbol table
     symbol_t *sym = symbol_table;
     while (sym) {
         symbol_t *next = sym->next;
         free(sym->name);
         free(sym->type);
-        free(sym->mlir_name);
         free(sym);
         sym = next;
     }
+    symbol_table = NULL;
+    
+    // interpreter_cleanup is called by pdriver
 }

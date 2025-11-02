@@ -22,8 +22,11 @@ FLEX_OUTPUT = core/lexer/lex.yy.c
 BISON_SOURCE = core/parser/pparser.y
 BISON_OUTPUT_C = core/parser/pparser.tab.c
 BISON_OUTPUT_H = core/parser/pparser.tab.h
-C_SOURCES = core/lexer/ldriver.c core/parser/pdriver.c core/main.c
+C_SOURCES = core/lexer/ldriver.c core/parser/pdriver.c core/main.c core/interpreter.c
 EXECUTABLE = cc
+LLVM_CONFIG = llvm-config-18
+LLVM_CFLAGS = $(shell $(LLVM_CONFIG) --cflags)
+LLVM_LDFLAGS = $(shell $(LLVM_CONFIG) --ldflags --libs core executionengine mcjit native)
 
 .PHONY: all lexer parser clean install
 
@@ -36,7 +39,7 @@ parser: $(BISON_SOURCE)
 	yacc -d -o $(BISON_OUTPUT_C) $(BISON_SOURCE)
 
 $(EXECUTABLE): lexer parser $(C_SOURCES)
-	clang -lfl -Icore/parser $(C_SOURCES) -o $(EXECUTABLE)
+	clang -lfl -Icore/parser -Icore $(LLVM_CFLAGS) $(C_SOURCES) $(LLVM_LDFLAGS) -o $(EXECUTABLE)
 
 install: all
 	cp $(EXECUTABLE) /usr/local/bin
